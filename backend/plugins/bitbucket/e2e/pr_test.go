@@ -44,6 +44,7 @@ func TestPrDataFlow(t *testing.T) {
 	// verify pr extraction
 	dataflowTester.FlushTabler(&models.BitbucketPullRequest{})
 	dataflowTester.FlushTabler(&models.BitbucketAccount{})
+	dataflowTester.FlushTabler(&models.BitbucketPrReviewer{})
 	dataflowTester.Subtask(tasks.ExtractApiPullRequestsMeta, taskData)
 	dataflowTester.VerifyTable(
 		models.BitbucketPullRequest{},
@@ -86,6 +87,22 @@ func TestPrDataFlow(t *testing.T) {
 			"html_url",
 			"uuid",
 			"has2_fa_enabled",
+		),
+	)
+
+	dataflowTester.VerifyTable(
+		models.BitbucketPrReviewer{},
+		"./snapshot_tables/_tool_bitbucket_pull_request_reviewers.csv",
+		e2ehelper.ColumnWithRawData(
+			"connection_id",
+			"repo_id",
+			"pull_request_id",
+			"reviewer_account",
+			"reviewer_name",
+			"role",
+			"approved",
+			"state",
+			"participated_on",
 		),
 	)
 

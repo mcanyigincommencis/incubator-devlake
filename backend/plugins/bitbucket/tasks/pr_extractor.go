@@ -77,8 +77,13 @@ type BitbucketApiPullRequest struct {
 		} `json:"commit"`
 		Repo *models.BitbucketApiRepo `json:"repository"`
 	} `json:"source"`
-	//Reviewers    []BitbucketAccountResponse `json:"reviewers"`
-	//Participants []BitbucketAccountResponse `json:"participants"`
+	Participants []struct {
+		User         *BitbucketAccountResponse `json:"user"`
+		Role         string                    `json:"role"`
+		Approved     bool                      `json:"approved"`
+		State        string                    `json:"state"`
+		ParticipatedOn *common.Iso8601Time    `json:"participated_on"`
+	} `json:"participants"`
 }
 
 func ExtractApiPullRequests(taskCtx plugin.SubTaskContext) errors.Error {
@@ -116,6 +121,32 @@ func ExtractApiPullRequests(taskCtx plugin.SubTaskContext) errors.Error {
 				bitbucketPr.MergedAt = rawL.MergeCommit.Date.ToNullableTime()
 			}
 			results = append(results, bitbucketPr)
+
+			// Process participants (reviewers)
+			for _, participant := range rawL.Participants {
+				if participant.User != nil {
+					// Extract reviewer account
+					reviewerAccount, err := convertAccount(participant.User, data.Options.ConnectionId)
+					if err != nil {
+						return nil, err
+					}
+					results = append(results, reviewerAccount)
+
+					// Create reviewer record
+					reviewer := &models.BitbucketPrReviewer{
+						ConnectionId:    data.Options.ConnectionId,
+						RepoId:          data.Options.FullName,
+						PullRequestId:   rawL.BitbucketId,
+						ReviewerAccount: reviewerAccount.AccountId,
+						ReviewerName:    reviewerAccount.DisplayName,
+						Role:            participant.Role,
+						Approved:        participant.Approved,
+						State:           participant.State,
+						ParticipatedOn:  participant.ParticipatedOn.ToNullableTime(),
+					}
+					results = append(results, reviewer)
+				}
+			}
 
 			return results, nil
 		},
